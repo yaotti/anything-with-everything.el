@@ -6,18 +6,39 @@
 ;; Keywords: anything
 ;;
 ;;
-;; Example:
-;; Download this file: XXX: gist url
+;; You can write a program in which language you like and you can use it
+;; with anything interface.
+;;
+;; * Simplest usage: 
 ;; (require 'anything-with-everything)
-;; (defun-anything-plugin "anything-hotentry" ;function name to register
-;;                        "get-hotentries.pl" ;script name
-;;                        "Get HatenaBookmark's hotentries" ;description
-;;                        "Hot Entries"       ;source name
-;;                        "View Entry"        ;action name (execute with --action=open)
-;; )
-;; and then `anything-hotentry' and `anything-hotentry-clear-cache' are defined so
-;; you can execute them like M-x `anything-hotentry'
-;; If you want to remove candidates cache, do M-x `anything-hotentry-clear-cache'
+;; (add-anything-plugin "anything-my-cool-process" "my-cool-script.pl")
+;; With this you can execute M-x `anything-my-cool-process'
+;;
+;; * Requirement for your script:
+;; Your script have to accept these two command line flag:
+;; --init, --action
+;; ** `yourscript --init=list` is executed to build up anything candidates.
+;; You have to print candidates for anything.el. One candidate per line.
+;; ** `yourscript --action=open` is required to execute anything action.
+;; After select a candidate, anything-with-everything execute
+;; `yourscript --action=open SELCTED_CANDIDATE`
+;;
+;; Example:
+;; Download this file into ~/.emacs.d/anything/scripts/get-emacswiki-changes.pl
+;;   https://gist.github.com/raw/732759/5e210890a98fc9b2de7463f8b3ec4c7d7d1b9d01/get-emacswiki-changes.pl
+;; Try to execute this like
+;; $ perl get_emacswiki-changes.pl --init=list
+;; If this works well, eval these elisp:
+;;
+;; (require 'anything-with-everything)
+;; (defun-anything-function-with-script "anything-emacswiki-changes" "get-emacswiki-changes.pl")
+;;
+;; then `anything-emacswiki-changes' is defined so you can execute this like
+;; M-x `anything-emacswiki-changes'
+;; If you want to remove candidates cache buffer, do C-c C-u in anything buffer.
+;;
+;; TODO: Can be assigned multiple actions
+;;
 
 (eval-when-compile (require 'cl))
 
@@ -26,114 +47,64 @@
   "~/.emacs.d/anything/scripts/"
   "The root directory containing scripts for anything plugins")
 
-(defmacro* add-anything-plugin (function-name script &optional description sources action-name)
+(defun awe:defvar-source (elt script)
+  "defvar source with ((option source-name symbol-name) script)"
+  `(defvar ,(intern (caddr elt))
+     '((name . ,(cadr elt))
+       (init . (lambda ()
+                 (unless (anything-candidate-buffer)
+                   (with-current-buffer
+                       (anything-candidate-buffer 'global)
+                     (message "Building up candidates...")
+                     (insert (shell-command-to-string
+                              (concat ,script " --init=" ,(car elt))))))))
+       (candidates-in-buffer)
+       (action . (("Open" . ,action-symbol)))))
+  )
+
+
+(defmacro* defun-anything-function-with-script (function-name script &optional description sources)
   (let* ((function-symbol (intern function-name))
          (function-description
           (if description description
             (concat "Execute Anything script: " script)))
-         ;; (sname (if source-name source-name (concat "Source from " script)))
-         (aname (if action-name action-name "Open"))
          (cache-clear-function-symbol
           (intern (concat function-name "-clear-cache")))
          (cache-clear-function-description
-          (format "Function to clear candidate cache for %s" script)
-          )
-         (action-symbol (intern (concat "awe:action-for-" script)))
-         ;;(sources (if (stringp sources) '(("list" . sources)) sources))
-         ;;(source-symbol (intern (concat "awe:source-for-" script)))
-         (source-symbols (mapcar (lambda (pair)
-                                   ;; XXX
-                                   (message
-                                    (format "-----awe:source-for-%s-in-%s"
-                                            (car pair)
-                                            script))
-                                   ;; XXX end
-                                   (intern
-                                    (format "awe:source-for-%s-in-%s"
-                                            (car pair)
-                                            script)))
-                                 (cadr sources)))
-         (script-path (concat awe:scripts-root-dir script)))
-    `(progn
+          (format "Function to clear candidate cache for %s" script))
+         (script-path (concat awe:scripts-root-dir script))
+         (anything-script-buffer-name (format "*Anything script: %s*" script-path))
+         (action-symbol (intern (concat "awe:action-for-" script-path)))
+         (script-sources (if (and sources (listp sources))
+                             sources
+                           `(("list" . ,script-path))))
+         (source-option-name-symbols
+          (mapcar (lambda (pair)
+                    (list
+                     (car pair)
+                     (cdr pair)
+                     (format "anything-c-source-for-%s-in-%s"
+                             (car pair) script)))
+                  script-sources
+                  ))
+         )
+         `(progn
        ;; define action
        (defun ,action-symbol (candidate)
          (let ((quoted-candidate (format "\"%s\"" candidate)))
            (shell-command-to-string (concat ,script-path " --action=open " quoted-candidate))))
-       ;; define source
-       ;; XXX
-       ;; ,(message (format "sources length: %d" (length sources)))
-       ;; ,(message (format "first source: %s" (cadr sources)))
-       ;; XXX end
-       (mapcar
-        (lambda (pair)
-          (message (car pair))
-          (defvar ,(intern (format "awe:source-for-%s-in-%s"
-                                   (car pair)
-                                   script))
-            '((name . ,(cdr pair))
-              (init . (lambda ()
-                        (unless (anything-candidate-buffer)
-                          (with-current-buffer
-                              (anything-candidate-buffer 'global)
-                            (message "Building up candidates...")
-                            (insert (shell-command-to-string
-                                     (concat ,script-path " --init=" (car pair))))))))
-              (candidates-in-buffer)
-              (action . ((,aname . ,action-symbol))))))
-        ,'(cadr sources))
+
        ;; define anything function
        (defun ,function-symbol ()
          ,description
          (interactive)
-         (anything-other-buffer '(,source-symbols)
-                                (format "*Anything script: %s" ,script))
+         (anything-other-buffer ',(mapcar (lambda (elt) (intern (caddr elt))) source-option-name-symbols)
+                                ,anything-script-buffer-name)
          )
-       ;; (defun ,cache-clear-function-symbol ()
-       ;;   ,cache-clear-function-description
-       ;;   (interactive)
-       ;;   (let ((candidate-buffer-name
-       ;;          (format " *anything candidates:%s*" ,sname)))
-       ;;     (message "Clear cache for anything source: %s" ,sname)
-       ;;     (kill-buffer candidate-buffer-name)))
-       (message (concat "Defined functions for " ,script))
-       )))
-
-;; Simple
-(add-anything-plugin "anything-hotentry-1" "get-hotentries.pl"
-                     "Description"
-                     '(("list" . "Hot Entries")
-                       ("my_entries" . "My Entries")
-                       ("list" . "Hot Entries")))
-(anything-hotentry-1)
-(anything-hotentry-1-clear-cache)
-
-
-
-;; (add-anything-plugin "function-name"
-;;                      "script.pl"
-;;                      "description"
-;;                      '(("option-value1" . "Source1 Name") ; script --init=option-value1が実行される
-;;                        ("option-value2" . "Source2 Name")
-;;                        )
-;;                      '(("action1-option" . "Action1 Name"))
-;;                      )
-;; ;; Simple
-;; (add-anything-plugin "function-name"
-;;                      "script.pl"
-;;                      "description"
-;;                      "Source1 Name"     ; script --init=listを実行
-;;                      "Action1 Name"     ; script --action=openを実行
-;;                      )
-
-;; ;; Simplest
-;; (add-anything-plugin "anything-hotentry-1" "get-hotentries.pl")
-;; (anything-hotentry-1)
-;; (anything-hotentry-1-clear-cache)
-
-;; ;; Simplest
-;; (add-anything-plugin "anything-hotentry-1" "get-hotentries.pl")
-;; (anything-hotentry-1)
-;; (anything-hotentry-1-clear-cache)
-
+       ;; defvar source(s)
+       ,@(mapcar
+          (lambda (elt) (awe:defvar-source elt script-path))
+          source-option-name-symbols)
+    )))
 
 (provide 'anything-with-everything)
