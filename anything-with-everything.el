@@ -12,7 +12,7 @@
 ;;
 ;; * Simplest usage:
 ;; (require 'anything-with-everything)
-;; (add-anything-plugin "anything-my-cool-process" "my-cool-script.pl")
+;; (add-anything-plugin anything-my-cool-process "my-cool-script.pl")
 ;; With this you can execute M-x `anything-my-cool-process'
 ;;
 ;; * Requirement for your script:
@@ -32,7 +32,7 @@
 ;; If this works well, eval these elisp:
 ;;
 ;; (require 'anything-with-everything)
-;; (defun-anything-function-with-script "anything-emacswiki-changes" "get-emacswiki-changes.pl")
+;; (defun-anything-function-with-script anything-emacswiki-changes "get-emacswiki-changes.pl")
 ;; then `anything-emacswiki-changes' is defined so you can execute this like
 ;; M-x `anything-emacswiki-changes'
 ;; If you want to remove candidates cache buffer, do C-c C-u in anything buffer.
@@ -40,7 +40,7 @@
 ;;
 ;; Advanced usage:
 ;; You can assign multiple anything sources like
-;; (defun-anything-function-with-script "anything-with-multisource" "yourscript.pl"
+;; (defun-anything-function-with-script anything-with-multisource "yourscript.pl"
 ;;   (("script-option1" . "First source") ("script-option2" . "Second Source")))
 ;;
 ;; This means you get candiates with
@@ -51,7 +51,7 @@
 ;; Download this file into ~/.emacs.d/anything/scripts/get-hb-entries.pl
 ;;   https://gist.github.com/raw/731856/cf186c3da3d463aaec35c9d130fa79173780e79e/get-hb-entries.pl
 ;; and eval this
-;; (defun-anything-function-with-script "anything-hb-entries" "get-hb-entries.pl"
+;; (defun-anything-function-with-script anything-hb-entries "get-hb-entries.pl"
 ;;   (("list" . "Hot Entries") ("my_entries" . "My Entries")))
 ;; And you can execute M-x `anything-hateb-entries'.
 ;; You can get candidates from multiple anything source.
@@ -80,11 +80,10 @@
   )
 
 
-(defmacro* defun-anything-function-with-script (function-name script &optional sources)
+(defmacro* defun-anything-function-with-script (function-symbol script &optional sources)
   (let* ((script-path (concat awe:scripts-root-dir script))
          (script-sources (if sources sources `(("list" . ,script-path)))))
-    (let ((function-symbol (intern function-name))
-          (function-description
+    (let ((function-description
            (concat "Execute Anything script: " script-path))
           (anything-script-buffer-name
            (format "*Anything script: %s*" script-path))
