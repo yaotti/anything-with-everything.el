@@ -4,12 +4,13 @@
 
 ;; Author: Hiroshige Umino <yaotti@gmail.com>
 ;; Keywords: anything
+;; Repository: https://github.com/yaotti/anything-with-everything.el
 ;;
 ;;
 ;; You can write a program in which language you like and you can use it
 ;; with anything interface.
 ;;
-;; * Simplest usage: 
+;; * Simplest usage:
 ;; (require 'anything-with-everything)
 ;; (add-anything-plugin "anything-my-cool-process" "my-cool-script.pl")
 ;; With this you can execute M-x `anything-my-cool-process'
@@ -52,7 +53,7 @@
 ;; and eval this
 ;; (defun-anything-function-with-script "anything-hb-entries" "get-hb-entries.pl"
 ;;   (("list" . "Hot Entries") ("my_entries" . "My Entries")))
-;; And execute M-x `anything-hateb-entries'.
+;; And you can execute M-x `anything-hateb-entries'.
 ;; You can get candidates from multiple anything source.
 
 ;;
@@ -75,7 +76,7 @@
                      (insert (shell-command-to-string
                               (concat ,script " --init=" ,(car elt))))))))
        (candidates-in-buffer)
-       (action . (("Open" . ,action-symbol)))))
+       (action . (("Open" . ,action-symbol))))) ;TODO: multiple actions
   )
 
 
