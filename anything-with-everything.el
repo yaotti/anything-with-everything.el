@@ -82,7 +82,7 @@
 
 (defmacro* defun-anything-function-with-script (function-name script &optional sources)
   (let* ((script-path (concat awe:scripts-root-dir script))
-        (script-sources (if sources sources `(("list" . ,script-path)))))
+         (script-sources (if sources sources `(("list" . ,script-path)))))
     (let ((function-symbol (intern function-name))
           (function-description
            (concat "Execute Anything script: " script-path))
@@ -98,23 +98,25 @@
                               (car pair) script)))
                    script-sources
                    )))
-         `(progn
-       ;; define action
-       (defun ,action-symbol (candidate)
-         (let ((quoted-candidate (format "\"%s\"" candidate)))
-           (shell-command-to-string (concat ,script-path " --action=open " quoted-candidate))))
+      `(progn
+         ;; define action
+         (defun ,action-symbol (candidate)
+           (let ((quoted-candidate (format "\"%s\"" candidate)))
+             (shell-command-to-string (concat ,script-path " --action=open " quoted-candidate))))
 
-       ;; define anything function
-       (defun ,function-symbol ()
-         ,function-description
-         (interactive)
-         (anything-other-buffer ',(mapcar (lambda (elt) (intern (caddr elt))) source-option-name-symbols)
-                                ,anything-script-buffer-name)
+         ;; define anything function
+         (defun ,function-symbol ()
+           ,function-description
+           (interactive)
+           (anything-other-buffer ',(mapcar (lambda (elt) (intern (caddr elt))) source-option-name-symbols)
+                                  ,anything-script-buffer-name)
+           )
+         ;; defvar source(s)
+         ,@(mapcar
+            (lambda (elt) (awe:defvar-source elt script-path action-symbol))
+            source-option-name-symbols)
+         ,(message (format "Defined anything function: %s" (symbol-name function-symbol)))
          )
-       ;; defvar source(s)
-       ,@(mapcar
-          (lambda (elt) (awe:defvar-source elt script-path action-symbol))
-          source-option-name-symbols)
-    ))))
+      )))
 
 (provide 'anything-with-everything)
