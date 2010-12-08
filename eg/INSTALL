@@ -1,0 +1,1 @@
+copy get-emacswiki-changes.pl get-hb-entries.pl ~/.emacs.d/anything/scripts/
